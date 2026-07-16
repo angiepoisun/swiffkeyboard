@@ -26,8 +26,6 @@ targets:
       - path: Shared
     resources:
       - path: App/Assets.xcassets
-    info:
-      path: App/Info.plist
     entitlements:
       path: App/SwipeKeys.entitlements
       properties:
@@ -38,6 +36,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: App/Info.plist
     dependencies:
       - target: SwipeKeysKeyboard
         embed: true
@@ -54,8 +53,6 @@ targets:
       - path: Shared
     resources:
       - path: Keyboard/Resources
-    info:
-      path: Keyboard/Info.plist
     entitlements:
       path: Keyboard/SwipeKeysKeyboard.entitlements
       properties:
@@ -67,6 +64,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: true
         GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Keyboard/Info.plist
 
 schemes:
   SwipeKeys:
