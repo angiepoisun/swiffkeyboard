@@ -37,9 +37,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys
         TARGETED_DEVICE_FAMILY: "1"
-        INFOPLIST_KEY_UILaunchScreen_Generation: true
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
-        INFOPLIST_KEY_CFBundleDisplayName: "SwipeKeys"
+        GENERATE_INFOPLIST_FILE: NO
     dependencies:
       - target: SwipeKeysKeyboard
         embed: true
@@ -68,6 +66,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys.keyboard
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: true
+        GENERATE_INFOPLIST_FILE: NO
 
 schemes:
   SwipeKeys:
