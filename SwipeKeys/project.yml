@@ -1,0 +1,81 @@
+name: SwipeKeys
+options:
+  bundleIdPrefix: com.angieng.swipekeys
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  SwipeKeys:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - "Info.plist"
+          - "SwipeKeys.entitlements"
+          - "Assets.xcassets/**"
+      - path: Shared
+    resources:
+      - path: App/Assets.xcassets
+    info:
+      path: App/Info.plist
+    entitlements:
+      path: App/SwipeKeys.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.angieng.swipekeys
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
+        INFOPLIST_KEY_CFBundleDisplayName: "SwipeKeys"
+    dependencies:
+      - target: SwipeKeysKeyboard
+        embed: true
+
+  SwipeKeysKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Keyboard
+        excludes:
+          - "Info.plist"
+          - "SwipeKeysKeyboard.entitlements"
+          - "Resources/**"
+      - path: Shared
+    resources:
+      - path: Keyboard/Resources
+    info:
+      path: Keyboard/Info.plist
+    entitlements:
+      path: Keyboard/SwipeKeysKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.angieng.swipekeys
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys.keyboard
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: true
+
+schemes:
+  SwipeKeys:
+    build:
+      targets:
+        SwipeKeys: all
+        SwipeKeysKeyboard: all
+    run:
+      config: Debug
+    archive:
+      config: Release
