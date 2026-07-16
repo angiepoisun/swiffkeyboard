@@ -96,7 +96,7 @@ final class TypingPadView: UIView {
     }
 
     private func layout(row: [KeyButton], y: CGFloat, height: CGFloat) {
-        let weights = row.map(weight(for:))
+        let weights = row.map { weight(for: $0.definition) }
         let totalWeight = weights.reduce(0, +)
         guard totalWeight > 0 else { return }
         let unit = bounds.width / totalWeight
