@@ -11,12 +11,26 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
     private var languages: [SupportedLanguage] = [.englishUS]
     private var activeLanguageIndex = 0
     private var languageLayout = LanguageLayout.layout(for: .englishUS)
-    private lazy var dictionary = WordFrequencyDictionary(language: .englishUS)
+    private lazy var wordDictionary = WordFrequencyDictionary(language: .englishUS)
+    private lazy var pinyinDictionary = PinyinDictionary(language: .chineseSimplified)
+
+    private var activeLanguage: SupportedLanguage { languages[activeLanguageIndex] }
+    private var isPinyinMode: Bool { activeLanguage.inputMethod == .pinyin }
+
+    /// Raw pinyin letters typed so far, never inserted into the document
+    /// directly — only a chosen Hanzi candidate gets inserted. Custom
+    /// keyboard extensions can't show real marked/preedit text in the host
+    /// app's field (UITextDocumentProxy has no such API, unlike the system
+    /// keyboard), so this buffer and its candidates live entirely in our
+    /// own suggestion bar until committed.
+    private var pinyinBuffer = ""
 
     private enum SuggestionContext {
         case none
-        case typingWord(String)
-        case committedWord(String)
+        case typingWord(String)     // Latin tap-typing: prefix completions, replaceable
+        case committedWord(String)  // Latin glide result already inserted (+ trailing space), replaceable
+        case pinyinComposing        // Pinyin buffer in progress; nothing inserted yet
+        case committedHanzi(String) // Pinyin glide result already inserted, replaceable
     }
     private var suggestionContext: SuggestionContext = .none
 
@@ -46,8 +60,8 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         languages = LanguageSettings.enabledLanguages()
         let active = LanguageSettings.activeLanguage() ?? languages.first ?? .englishUS
         activeLanguageIndex = languages.firstIndex(of: active) ?? 0
-        languageLayout = LanguageLayout.layout(for: languages[activeLanguageIndex])
-        dictionary.reload(language: languages[activeLanguageIndex])
+        languageLayout = LanguageLayout.layout(for: activeLanguage)
+        reloadActiveDictionary()
     }
 
     private func setupKeyboardView() {
@@ -68,12 +82,23 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         heightConstraint.isActive = true
         self.heightConstraint = heightConstraint
 
-        keyboardView.setDictionary(dictionary)
+        keyboardView.setDictionary(activeCandidateSource)
         keyboardView.setLanguages(languages, activeIndex: activeLanguageIndex)
     }
 
     private func preferredHeight(for size: CGSize) -> CGFloat {
         size.width > size.height ? 210 : 280
+    }
+
+    private var activeCandidateSource: any GlideCandidateSource {
+        isPinyinMode ? pinyinDictionary : wordDictionary
+    }
+
+    private func reloadActiveDictionary() {
+        switch activeLanguage.inputMethod {
+        case .latin: wordDictionary.reload(language: activeLanguage)
+        case .pinyin: pinyinDictionary.reload(language: activeLanguage)
+        }
     }
 
     // MARK: - Page presentation
@@ -85,7 +110,10 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
     private func presentCurrentPage() {
         switch mode {
         case .letters:
-            keyboardView.showTypingPage(languageLayout.page, mode: .letters, shifted: isShifted, capsLocked: isCapsLocked, glideEnabled: swipeTypingEnabled)
+            // Case doesn't mean anything for pinyin romanization; always show lowercase.
+            let shifted = isPinyinMode ? false : isShifted
+            let capsLocked = isPinyinMode ? false : isCapsLocked
+            keyboardView.showTypingPage(languageLayout.page, mode: .letters, shifted: shifted, capsLocked: capsLocked, glideEnabled: swipeTypingEnabled)
         case .symbols1:
             keyboardView.showTypingPage(SymbolsLayout.page1, mode: .symbols1, shifted: false, capsLocked: false, glideEnabled: false)
         case .symbols2:
@@ -95,59 +123,105 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         }
     }
 
+    private func switchMode(to newMode: KeyboardMode) {
+        if isPinyinMode, !pinyinBuffer.isEmpty {
+            commitPinyinBuffer()
+        }
+        mode = newMode
+        presentCurrentPage()
+    }
+
     // MARK: - KeyboardViewActionDelegate
 
     func keyboardView(_ view: KeyboardView, didTapKey key: KeyDefinition) {
         switch key {
         case .char(let base):
-            insertCharacter(base)
+            if isPinyinMode {
+                pinyinBuffer += base.lowercased()
+                suggestionContext = .pinyinComposing
+                refreshPinyinSuggestions()
+            } else {
+                insertCharacter(base)
+            }
         case .shift:
             isShifted.toggle()
             isCapsLocked = false
             keyboardView.updateShiftAppearance(shifted: isShifted, capsLocked: isCapsLocked)
         case .backspace:
-            textDocumentProxy.deleteBackward()
-            suggestionContext = .typingWord(currentTypedWord())
-            refreshSuggestions()
-            updateAutoShiftState()
+            if isPinyinMode, !pinyinBuffer.isEmpty {
+                pinyinBuffer.removeLast()
+                if pinyinBuffer.isEmpty {
+                    suggestionContext = .none
+                    keyboardView.setSuggestions([])
+                } else {
+                    suggestionContext = .pinyinComposing
+                    refreshPinyinSuggestions()
+                }
+            } else {
+                textDocumentProxy.deleteBackward()
+                suggestionContext = .typingWord(currentTypedWord())
+                refreshSuggestions()
+                updateAutoShiftState()
+            }
         case .toSymbols1:
-            mode = .symbols1
-            presentCurrentPage()
+            switchMode(to: .symbols1)
         case .toSymbols2:
-            mode = .symbols2
-            presentCurrentPage()
+            switchMode(to: .symbols2)
         case .toLetters:
-            mode = .letters
-            presentCurrentPage()
+            switchMode(to: .letters)
         case .toggleEmoji:
-            mode = .emoji
-            presentCurrentPage()
+            switchMode(to: .emoji)
         case .space:
-            commitPendingWordIfNeeded()
-            textDocumentProxy.insertText(" ")
-            suggestionContext = .none
-            refreshSuggestions()
+            if isPinyinMode, !pinyinBuffer.isEmpty {
+                commitPinyinBuffer()
+            } else {
+                commitPendingWordIfNeeded()
+                textDocumentProxy.insertText(" ")
+                suggestionContext = .none
+                refreshSuggestions()
+            }
             updateAutoShiftState()
         case .return:
-            commitPendingWordIfNeeded()
-            textDocumentProxy.insertText("\n")
-            suggestionContext = .none
-            refreshSuggestions()
+            if isPinyinMode, !pinyinBuffer.isEmpty {
+                commitPinyinBuffer()
+            } else {
+                commitPendingWordIfNeeded()
+                textDocumentProxy.insertText("\n")
+                suggestionContext = .none
+                refreshSuggestions()
+            }
             updateAutoShiftState()
         case .none:
             break
         }
     }
 
-    func keyboardView(_ view: KeyboardView, didFinishGlide word: String, alternates: [String]) {
-        let cased = applyCurrentCase(to: word)
-        textDocumentProxy.insertText(cased + " ")
-        dictionary.learn(word: word)
-        suggestionContext = .committedWord(word)
-        keyboardView.setSuggestions(([word] + alternates).map { $0 })
-        if isShifted, !isCapsLocked {
-            isShifted = false
-            keyboardView.updateShiftAppearance(shifted: isShifted, capsLocked: isCapsLocked)
+    func keyboardView(_ view: KeyboardView, didFinishGlide matchedKey: String, alternates alternateKeys: [String]) {
+        if isPinyinMode {
+            pinyinBuffer = ""
+            let primaryCandidates = pinyinDictionary.hanziCandidates(forExactPinyin: matchedKey)
+            guard let topHanzi = primaryCandidates.first else { return }
+            textDocumentProxy.insertText(topHanzi)
+
+            var suggestions = primaryCandidates
+            for altKey in alternateKeys {
+                if let altTop = pinyinDictionary.hanziCandidates(forExactPinyin: altKey).first,
+                   !suggestions.contains(altTop) {
+                    suggestions.append(altTop)
+                }
+            }
+            suggestionContext = .committedHanzi(topHanzi)
+            keyboardView.setSuggestions(suggestions)
+        } else {
+            let cased = applyCurrentCase(to: matchedKey)
+            textDocumentProxy.insertText(cased + " ")
+            wordDictionary.learn(word: matchedKey)
+            suggestionContext = .committedWord(matchedKey)
+            keyboardView.setSuggestions([matchedKey] + alternateKeys)
+            if isShifted, !isCapsLocked {
+                isShifted = false
+                keyboardView.updateShiftAppearance(shifted: isShifted, capsLocked: isCapsLocked)
+            }
         }
         updateAutoShiftState()
     }
@@ -162,21 +236,28 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         setActiveLanguage(language, showToast: true)
     }
 
-    func keyboardView(_ view: KeyboardView, didSelectSuggestion word: String) {
+    func keyboardView(_ view: KeyboardView, didSelectSuggestion selectedText: String) {
         switch suggestionContext {
         case .typingWord(let current):
             deleteBackward(count: current.count)
-            let cased = applyCurrentCase(to: word)
+            let cased = applyCurrentCase(to: selectedText)
             textDocumentProxy.insertText(cased + " ")
-            dictionary.learn(word: word)
+            wordDictionary.learn(word: selectedText)
         case .committedWord(let current):
             deleteBackward(count: current.count + 1) // + trailing space
-            let cased = applyCurrentCase(to: word)
+            let cased = applyCurrentCase(to: selectedText)
             textDocumentProxy.insertText(cased + " ")
-            dictionary.learn(word: word)
+            wordDictionary.learn(word: selectedText)
+        case .committedHanzi(let current):
+            deleteBackward(count: current.count) // no trailing space to account for
+            textDocumentProxy.insertText(selectedText)
+        case .pinyinComposing:
+            // Nothing has touched the document yet; just commit the pick.
+            textDocumentProxy.insertText(selectedText)
+            pinyinBuffer = ""
         case .none:
-            textDocumentProxy.insertText(word + " ")
-            dictionary.learn(word: word)
+            textDocumentProxy.insertText(selectedText + " ")
+            wordDictionary.learn(word: selectedText)
         }
         suggestionContext = .none
         keyboardView.setSuggestions([])
@@ -208,8 +289,19 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
 
     private func commitPendingWordIfNeeded() {
         if case .typingWord(let word) = suggestionContext, word.count > 1 {
-            dictionary.learn(word: word)
+            wordDictionary.learn(word: word)
         }
+    }
+
+    /// Inserts the top candidate for the current pinyin buffer (or the raw
+    /// letters, if nothing matched, so typing is never silently dropped).
+    private func commitPinyinBuffer() {
+        guard !pinyinBuffer.isEmpty else { return }
+        let candidates = pinyinDictionary.hanziCandidates(forExactPinyin: pinyinBuffer)
+        textDocumentProxy.insertText(candidates.first ?? pinyinBuffer)
+        pinyinBuffer = ""
+        suggestionContext = .none
+        keyboardView.setSuggestions([])
     }
 
     private func deleteBackward(count: Int) {
@@ -234,7 +326,15 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
             keyboardView.setSuggestions([])
             return
         }
-        keyboardView.setSuggestions(dictionary.completions(forPrefix: word))
+        keyboardView.setSuggestions(wordDictionary.completions(forPrefix: word))
+    }
+
+    private func refreshPinyinSuggestions() {
+        guard mode == .letters, !pinyinBuffer.isEmpty else {
+            keyboardView.setSuggestions([])
+            return
+        }
+        keyboardView.setSuggestions(pinyinDictionary.candidates(forPrefix: pinyinBuffer))
     }
 
     private func updateAutoShiftState() {
@@ -263,12 +363,14 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         guard let index = languages.firstIndex(of: language) else { return }
         activeLanguageIndex = index
         LanguageSettings.setActiveLanguage(language)
-        dictionary.reload(language: language)
         languageLayout = LanguageLayout.layout(for: language)
+        pinyinBuffer = ""
         mode = .letters
         suggestionContext = .none
+
+        reloadActiveDictionary()
         presentCurrentPage()
-        keyboardView.setDictionary(dictionary)
+        keyboardView.setDictionary(activeCandidateSource)
         keyboardView.setLanguages(languages, activeIndex: activeLanguageIndex)
         keyboardView.setSuggestions([])
         if showToast {

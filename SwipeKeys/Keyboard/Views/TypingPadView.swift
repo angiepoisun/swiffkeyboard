@@ -14,7 +14,7 @@ protocol TypingPadDelegate: AnyObject {
 /// standard iOS keyboard behavior.
 final class TypingPadView: UIView {
     weak var delegate: TypingPadDelegate?
-    var dictionary: WordFrequencyDictionary?
+    var dictionary: (any GlideCandidateSource)?
 
     private(set) var page = KeyboardPage(rows: [])
     private var isShifted = false
@@ -197,7 +197,7 @@ final class TypingPadView: UIView {
     private func finishGlide() {
         guard let dictionary else { return }
         let keyCenters = glideKeyCenters()
-        let results = GlideTypingEngine.candidates(forPath: currentPath, keyCenters: keyCenters, dictionary: dictionary)
+        let results = GlideTypingEngine.candidates(forPath: currentPath, keyCenters: keyCenters, source: dictionary)
         guard !results.isEmpty else { return }
         delegate?.typingPad(self, didFinishGlide: results[0], alternates: Array(results.dropFirst()))
     }

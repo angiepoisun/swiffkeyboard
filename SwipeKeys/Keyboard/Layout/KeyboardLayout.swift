@@ -54,6 +54,18 @@ struct LanguageLayout {
             ["a", "s", "d", "f", "g", "h", "j", "k", "l", "ö", "ä"],
             ["y", "x", "c", "v", "b", "n", "m"],
         ]),
+        // Pinyin input uses the plain QWERTY layout to spell romanized
+        // syllables (e.g. "nihao"); the candidate bar turns that into Hanzi.
+        .chineseSimplified: LanguageLayout(language: .chineseSimplified, letterRows: [
+            ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+            ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+            ["z", "x", "c", "v", "b", "n", "m"],
+        ]),
+        .chineseTraditional: LanguageLayout(language: .chineseTraditional, letterRows: [
+            ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+            ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+            ["z", "x", "c", "v", "b", "n", "m"],
+        ]),
     ]
 
     static func layout(for language: SupportedLanguage) -> LanguageLayout {

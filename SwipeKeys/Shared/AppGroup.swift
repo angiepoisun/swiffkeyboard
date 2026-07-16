@@ -26,6 +26,8 @@ enum SupportedLanguage: String, CaseIterable, Identifiable, Codable {
     case spanish = "es-ES"
     case french = "fr-FR"
     case german = "de-DE"
+    case chineseSimplified = "zh-Hans"
+    case chineseTraditional = "zh-Hant"
 
     var id: String { rawValue }
 
@@ -35,6 +37,8 @@ enum SupportedLanguage: String, CaseIterable, Identifiable, Codable {
         case .spanish: return "Español"
         case .french: return "Français"
         case .german: return "Deutsch"
+        case .chineseSimplified: return "简体中文"
+        case .chineseTraditional: return "繁體中文"
         }
     }
 
@@ -44,6 +48,8 @@ enum SupportedLanguage: String, CaseIterable, Identifiable, Codable {
         case .spanish: return "🇪🇸"
         case .french: return "🇫🇷"
         case .german: return "🇩🇪"
+        case .chineseSimplified: return "🇨🇳"
+        case .chineseTraditional: return "🇹🇼"
         }
     }
 
@@ -53,8 +59,29 @@ enum SupportedLanguage: String, CaseIterable, Identifiable, Codable {
         case .spanish: return "es"
         case .french: return "fr"
         case .german: return "de"
+        case .chineseSimplified: return "zh-Hans"
+        case .chineseTraditional: return "zh-Hant"
         }
     }
+
+    /// How keys typed on the QWERTY layout turn into inserted text. Latin
+    /// languages insert each tapped/glided letter (or word) directly.
+    /// Pinyin languages type a romanization that never touches the document
+    /// on its own — it composes in a local buffer and only a chosen Hanzi
+    /// candidate gets inserted, the same constraint every third-party
+    /// Chinese iOS keyboard works under (UITextDocumentProxy has no marked
+    /// / preedit text support, unlike the system keyboard).
+    var inputMethod: KeyboardInputMethod {
+        switch self {
+        case .englishUS, .spanish, .french, .german: return .latin
+        case .chineseSimplified, .chineseTraditional: return .pinyin
+        }
+    }
+}
+
+enum KeyboardInputMethod {
+    case latin
+    case pinyin
 }
 
 /// Reads/writes the ordered list of languages the user has enabled for

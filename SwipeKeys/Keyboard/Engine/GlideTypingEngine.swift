@@ -28,15 +28,18 @@ enum GlideTypingEngine {
     ///     same coordinate space as `keyCenters`.
     ///   - keyCenters: center point of every glideable key currently on
     ///     screen (lowercase character -> center).
-    ///   - dictionary: the active language's word list.
+    ///   - source: the active language's candidate source — a word list for
+    ///     Latin languages, a pinyin dictionary for Chinese. Returned
+    ///     strings are that source's *keys* (a word for Latin, a
+    ///     romanization for Pinyin), not necessarily what gets inserted.
     static func candidates(
         forPath rawPath: [CGPoint],
         keyCenters: [Character: CGPoint],
-        dictionary: WordFrequencyDictionary
+        source: any GlideCandidateSource
     ) -> [String] {
         guard rawPath.count >= 2, let start = rawPath.first, let end = rawPath.last else { return [] }
 
-        // 1. Prune: only consider words starting near the path's first key,
+        // 1. Prune: only consider keys starting near the path's first key,
         // within a plausible length range for how far the finger travelled.
         guard let startLetter = nearestKey(to: start, in: keyCenters) else { return [] }
         let pathLength = totalLength(rawPath)
@@ -47,7 +50,7 @@ enum GlideTypingEngine {
 
         let endLetter = nearestKey(to: end, in: keyCenters)
 
-        let pool = dictionary.words(startingWith: startLetter)
+        let pool = source.candidateKeys(startingWith: startLetter)
         guard !pool.isEmpty else { return [] }
 
         let sampledUserPath = PathSampler.resample(rawPath, to: resampleCount)
@@ -56,8 +59,8 @@ enum GlideTypingEngine {
         for word in pool {
             guard word.count >= minLength, word.count <= maxLength else { continue }
             if let endLetter, word.count > 2, let lastChar = word.lowercased().last, lastChar != endLetter {
-                // Soft filter: skip words that clearly end far from where
-                // the finger lifted, unless the word is very short.
+                // Soft filter: skip keys that clearly end far from where
+                // the finger lifted, unless the key is very short.
                 if keyCenters[lastChar]?.distance(to: end) ?? 0 > averageKeySpacing * 2.2 {
                     continue
                 }
@@ -66,8 +69,8 @@ enum GlideTypingEngine {
             let sampledIdeal = PathSampler.resample(ideal, to: resampleCount)
             let shapeDistance = meanDistance(sampledUserPath, sampledIdeal)
             let normalizedShape = averageKeySpacing > 0 ? shapeDistance / averageKeySpacing : shapeDistance
-            let frequency = max(dictionary.frequency(of: word), 1)
-            // log-scaled frequency bonus so very common words win close calls.
+            let frequency = max(source.frequency(ofKey: word), 1)
+            // log-scaled frequency bonus so very common keys win close calls.
             let frequencyBonus = log(Double(frequency) + 1) * 0.18
             let score = normalizedShape - frequencyBonus
             scored.append(Candidate(word: word, score: score))

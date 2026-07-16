@@ -6,8 +6,8 @@ a keyboard extension.
 ## Layout
 
 - **Number row** always on top, then a **QWERTY/AZERTY/QWERTZ letter block**
-  depending on the active language (English, Spanish, French, German ship
-  by default).
+  depending on the active language (English, Spanish, French, German,
+  Chinese Simplified, and Chinese Traditional ship by default).
 - **Bottom row**: `123` ↔ symbols toggle, an emoji toggle, a large
   **spacebar**, and return. There is no globe key — **swipe the spacebar
   left or right to cycle the input language**, previewing the target
@@ -42,6 +42,39 @@ dictionaries (a few hundred words per language, `word frequency` per line)
 — swap in larger frequency-ranked word lists for production use; the
 loader and pruning logic already scale to that.
 
+## Chinese (Pinyin)
+
+Chinese Simplified and Traditional don't type like the Latin languages —
+there's no letter-for-letter mapping from a QWERTY key to a Hanzi
+character. Instead, both use the exact same QWERTY layout to type
+**romanized pinyin** (e.g. "nihao"), and a **candidate bar** turns that
+into Hanzi, exactly like a real Pinyin IME:
+
+- Typed pinyin composes in a local buffer shown only in the suggestion
+  bar — it never touches the document. This isn't a design choice we could
+  relax: `UITextDocumentProxy` (all a third-party keyboard extension gets)
+  has no marked/preedit-text API, so no custom iOS keyboard can show
+  inline composing text the way the system Pinyin keyboard does. Tapping a
+  candidate (or Space, which accepts the top one) inserts the chosen Hanzi
+  and clears the buffer; Space does *not* insert a literal space in this
+  mode, matching how Chinese text is actually written.
+- One pinyin key is often several homophones ("shi" → 是/时/十/事/市…) —
+  all of them show up as candidates so you can pick the right character,
+  not just the most common one.
+- **Swipe typing works here too**: gliding across the pinyin letters (e.g.
+  n-i-h-a-o) is scored by `GlideTypingEngine` exactly like a Latin word,
+  against `PinyinDictionary` instead of `WordFrequencyDictionary` — both
+  conform to a shared `GlideCandidateSource` protocol so the same engine
+  serves both without knowing which one it's talking to. A completed glide
+  inserts the top Hanzi candidate directly, with homophones/alternates
+  offered in the suggestion bar to replace it.
+- The bundled `zh-Hans.txt` / `zh-Hant.txt` (tab-separated
+  `pinyin  hanzi  frequency`) cover common HSK1–2-level vocabulary (~180
+  entries) — a working demo, not a production IME dictionary.
+- There's no fallback mode for typing literal Latin text (email addresses,
+  English words) while a Chinese keyboard is active — real Pinyin IMEs
+  usually have an "abc" toggle for that; out of scope here.
+
 ## Project layout
 
 ```
@@ -53,7 +86,7 @@ SwipeKeys/
     Layout/                 Per-language key layouts, symbol pages, emoji categories
     Views/                  KeyboardView, TypingPadView (glide+tap), BottomBarView (spacebar swipe),
                              SuggestionBarView, EmojiPadView, LanguageToastView, KeyButton
-    Engine/                 GlideTypingEngine, PathSampler, Trie, WordFrequencyDictionary
+    Engine/                 GlideTypingEngine, PathSampler, Trie, WordFrequencyDictionary, PinyinDictionary, GlideCandidateSource
     Resources/               *.txt word lists, bundled into the extension
   Shared/
     AppGroup.swift           Settings shared between the app and the extension via an App Group

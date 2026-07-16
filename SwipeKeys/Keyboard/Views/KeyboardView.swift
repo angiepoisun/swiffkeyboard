@@ -46,7 +46,7 @@ final class KeyboardView: UIView, TypingPadDelegate, BottomBarDelegate, Suggesti
 
     // MARK: - Configuration (driven by the controller)
 
-    func setDictionary(_ dictionary: WordFrequencyDictionary) {
+    func setDictionary(_ dictionary: any GlideCandidateSource) {
         typingPad.dictionary = dictionary
     }
 

@@ -77,6 +77,8 @@ struct ContentView: View {
         case .spanish: return "QWERTY + Ñ"
         case .french: return "AZERTY"
         case .german: return "QWERTZ"
+        case .chineseSimplified: return "Pinyin"
+        case .chineseTraditional: return "Pinyin"
         }
     }
 
