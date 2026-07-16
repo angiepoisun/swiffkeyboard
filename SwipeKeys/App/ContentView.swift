@@ -55,11 +55,11 @@ struct ContentView: View {
 
                 Section("3. Typing") {
                     Toggle("Swipe (glide) typing", isOn: $swipeTypingEnabled)
-                        .onChange(of: swipeTypingEnabled) { _, newValue in
+                        .onChange(of: swipeTypingEnabled) { newValue in
                             AppGroup.defaults.set(newValue, forKey: AppGroup.Key.swipeTypingEnabled)
                         }
                     Toggle("Auto-capitalize sentences", isOn: $autoCapitalize)
-                        .onChange(of: autoCapitalize) { _, newValue in
+                        .onChange(of: autoCapitalize) { newValue in
                             AppGroup.defaults.set(newValue, forKey: AppGroup.Key.autoCapitalize)
                         }
                 }
