@@ -82,14 +82,14 @@ SwipeKeys/
   project.yml              XcodeGen project spec (generates the .xcodeproj)
   App/                     Container app (SwiftUI) — onboarding + language/settings screen
   AppResources/
-    Assets.xcassets          App icon + accent color. Deliberately kept outside App/ — see below.
+    Assets.xcassets          App icon + accent color. Outside App/, included via `sources:` — see below.
   Keyboard/                The keyboard extension (UIKit)
     KeyboardViewController.swift   State machine: shift/caps, mode, active language, text insertion
     Layout/                 Per-language key layouts, symbol pages, emoji categories
     Views/                  KeyboardView, TypingPadView (glide+tap), BottomBarView (spacebar swipe),
                              SuggestionBarView, EmojiPadView, LanguageToastView, KeyButton
     Engine/                 GlideTypingEngine, PathSampler, Trie, WordFrequencyDictionary, PinyinDictionary, GlideCandidateSource
-    Resources/               *.txt word lists, bundled into the extension
+    Resources/               *.txt word lists, included via `sources:` — see below
   Shared/
     AppGroup.swift           Settings shared between the app and the extension via an App Group
 ```
@@ -119,19 +119,31 @@ hand-edit and impossible to verify without Xcode). To build:
    works entirely through the standard `UITextDocumentProxy` and the shared
    App Group).
 
-## A note on `AppResources/Assets.xcassets`
+## A note on `project.yml`'s `sources:`-only structure
 
-The asset catalog lives outside `App/` on purpose. Earlier it sat at
-`App/Assets.xcassets`, excluded from the `App` target's `sources:` entry
-and separately declared under `resources:` — the standard XcodeGen pattern
-for asset catalogs. In practice that overlap (same folder referenced by
-both an excluded-from `sources` path and a `resources` path) caused
-XcodeGen to silently drop the catalog from the generated project entirely
-— it wouldn't even show up in Xcode's navigator, so no `Assets.car` ever
-got compiled and app-icon validation failed no matter what was inside the
-catalog. Moving it to a sibling folder that no `sources` entry ever scans
-removes the overlap and the ambiguity with it. Don't move it back under
-`App/` without re-testing that XcodeGen actually includes it.
+Neither target uses XcodeGen's `resources:` or `entitlements:` target keys,
+on purpose. Both used to be declared the standard XcodeGen way (asset
+catalog and word-list `.txt` files under `resources:`, the App Group
+entitlement under `entitlements:` with `properties:`), and that's the
+normal, documented approach — but on at least one real XcodeGen install it
+silently produced a `.pbxproj` with **zero** references to any of those
+files: no `Assets.car` ever got compiled (app-icon validation failed no
+matter what was inside the catalog), and — near-certainly, same
+mechanism — the bundled dictionaries were dropped too, which is why glide
+typing could detect a swipe path but never produce a word. `xcodegen
+generate` reported success and no warnings the whole time.
+
+The fix was to stop asking XcodeGen to generate/manage those files at all:
+`AppResources/Assets.xcassets` and `Keyboard/Resources/*.txt` are now
+picked up as plain `sources:` entries (XcodeGen auto-categorizes non-code
+files it finds there into the resources build phase), and both
+entitlements files are wired directly via the `CODE_SIGN_ENTITLEMENTS`
+build setting instead of the `entitlements:` key. Every remaining
+mechanism in `project.yml` is one we have direct evidence works (Swift
+files compile, `INFOPLIST_FILE` is honored). If you reintroduce
+`resources:`/`entitlements:` here, verify with `grep -c` against the
+generated `project.pbxproj` that the files actually made it in — don't
+trust a clean `xcodegen generate` run or Xcode's navigator alone.
 
 ## Known limitations (given the scope of a first pass)
 
@@ -141,5 +153,5 @@ removes the overlap and the ambiguity with it. Don't move it back under
 - French/German words containing characters outside the on-screen layout
   (apostrophes, `ß`, hyphens) fall back to tap-typing only; they won't be
   offered as glide candidates.
-- No custom app icon has been supplied (`AppIcon.appiconset` is empty) —
-  add one before shipping.
+- The bundled app icon is a placeholder generated for this project —
+  swap it for real artwork before shipping.

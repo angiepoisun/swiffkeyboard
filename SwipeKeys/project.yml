@@ -30,13 +30,7 @@ targets:
           - "Info.plist"
           - "SwipeKeys.entitlements"
       - path: Shared
-    resources:
-      - path: AppResources/Assets.xcassets
-    entitlements:
-      path: App/SwipeKeys.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - group.com.angieng.swipekeys
+      - path: AppResources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys
@@ -44,6 +38,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: App/SwipeKeys.entitlements
     dependencies:
       - target: SwipeKeysKeyboard
         embed: true
@@ -56,15 +51,7 @@ targets:
         excludes:
           - "Info.plist"
           - "SwipeKeysKeyboard.entitlements"
-          - "Resources/**"
       - path: Shared
-    resources:
-      - path: Keyboard/Resources
-    entitlements:
-      path: Keyboard/SwipeKeysKeyboard.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - group.com.angieng.swipekeys
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.angieng.swipekeys.keyboard
@@ -72,6 +59,7 @@ targets:
         SKIP_INSTALL: true
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Keyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Keyboard/SwipeKeysKeyboard.entitlements
 
 schemes:
   SwipeKeys:
