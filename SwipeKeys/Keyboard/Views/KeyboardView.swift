@@ -3,6 +3,7 @@ import UIKit
 protocol KeyboardViewActionDelegate: AnyObject {
     func keyboardView(_ view: KeyboardView, didTapKey key: KeyDefinition)
     func keyboardView(_ view: KeyboardView, didFinishGlide word: String, alternates: [String])
+    func keyboardView(_ view: KeyboardView, didFailToMatchGlide tracedText: String)
     func keyboardViewDidDoubleTapShift(_ view: KeyboardView)
     func keyboardView(_ view: KeyboardView, didCommitLanguageSwitch language: SupportedLanguage)
     func keyboardView(_ view: KeyboardView, didSelectSuggestion word: String)
@@ -108,6 +109,10 @@ final class KeyboardView: UIView, TypingPadDelegate, BottomBarDelegate, Suggesti
 
     func typingPad(_ pad: TypingPadView, didFinishGlide word: String, alternates: [String]) {
         actionDelegate?.keyboardView(self, didFinishGlide: word, alternates: alternates)
+    }
+
+    func typingPad(_ pad: TypingPadView, didFailToMatchGlide tracedText: String) {
+        actionDelegate?.keyboardView(self, didFailToMatchGlide: tracedText)
     }
 
     func typingPadDidDoubleTapShift(_ pad: TypingPadView) {

@@ -82,6 +82,27 @@ enum GlideTypingEngine {
             .map { $0.word }
     }
 
+    /// Rough "what did the finger actually trace" fallback for when nothing
+    /// in `source` scored well enough to return — small dictionaries (like
+    /// the bundled Pinyin word list) miss far more swipes than a full-size
+    /// English list does, and silently doing nothing on a completed swipe
+    /// reads as the keyboard being broken. Walks the resampled path and
+    /// collapses it to the sequence of distinct nearest keys, the same way
+    /// a word's ideal path is built, just in reverse.
+    static func tracedLetters(forPath rawPath: [CGPoint], keyCenters: [Character: CGPoint]) -> String {
+        guard !keyCenters.isEmpty, rawPath.count > 1 else { return "" }
+        var result = ""
+        var lastChar: Character?
+        for point in PathSampler.resample(rawPath, to: 20) {
+            guard let nearest = nearestKey(to: point, in: keyCenters) else { continue }
+            if nearest != lastChar {
+                result.append(nearest)
+                lastChar = nearest
+            }
+        }
+        return result
+    }
+
     private static func nearestKey(to point: CGPoint, in keyCenters: [Character: CGPoint]) -> Character? {
         keyCenters.min { lhs, rhs in
             lhs.value.distance(to: point) < rhs.value.distance(to: point)

@@ -228,6 +228,28 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         updateAutoShiftState()
     }
 
+    /// Nothing scored well enough to offer as a real word/pinyin match —
+    /// rather than a completed swipe silently doing nothing, insert what
+    /// the finger actually traced so the user always gets *something* to
+    /// correct instead of an unresponsive keyboard. Not learned anywhere:
+    /// it's a raw guess, not a validated word.
+    func keyboardView(_ view: KeyboardView, didFailToMatchGlide tracedText: String) {
+        if isPinyinMode {
+            pinyinBuffer = ""
+            textDocumentProxy.insertText(tracedText + " ")
+        } else {
+            let cased = applyCurrentCase(to: tracedText)
+            textDocumentProxy.insertText(cased + " ")
+            if isShifted, !isCapsLocked {
+                isShifted = false
+                keyboardView.updateShiftAppearance(shifted: isShifted, capsLocked: isCapsLocked)
+            }
+        }
+        suggestionContext = .none
+        keyboardView.setSuggestions([])
+        updateAutoShiftState()
+    }
+
     func keyboardViewDidDoubleTapShift(_ view: KeyboardView) {
         isCapsLocked.toggle()
         isShifted = isCapsLocked

@@ -3,6 +3,7 @@ import UIKit
 protocol TypingPadDelegate: AnyObject {
     func typingPad(_ pad: TypingPadView, didTapKey key: KeyDefinition)
     func typingPad(_ pad: TypingPadView, didFinishGlide word: String, alternates: [String])
+    func typingPad(_ pad: TypingPadView, didFailToMatchGlide tracedText: String)
     func typingPadDidDoubleTapShift(_ pad: TypingPadView)
 }
 
@@ -203,8 +204,16 @@ final class TypingPadView: UIView {
         guard let dictionary else { return }
         let keyCenters = glideKeyCenters()
         let results = GlideTypingEngine.candidates(forPath: currentPath, keyCenters: keyCenters, source: dictionary)
-        guard !results.isEmpty else { return }
-        delegate?.typingPad(self, didFinishGlide: results[0], alternates: Array(results.dropFirst()))
+        if !results.isEmpty {
+            delegate?.typingPad(self, didFinishGlide: results[0], alternates: Array(results.dropFirst()))
+            return
+        }
+        // Nothing scored well enough (common with the small bundled Pinyin
+        // dictionary) — fall back to what the finger actually traced rather
+        // than silently doing nothing on a completed swipe.
+        let traced = GlideTypingEngine.tracedLetters(forPath: currentPath, keyCenters: keyCenters)
+        guard !traced.isEmpty else { return }
+        delegate?.typingPad(self, didFailToMatchGlide: traced)
     }
 
     private func glideKeyCenters() -> [Character: CGPoint] {
