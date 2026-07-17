@@ -60,6 +60,12 @@ final class KeyboardView: UIView, TypingPadDelegate, BottomBarDelegate, Suggesti
         suggestionBar.setSuggestions(words)
     }
 
+    /// The pinyin typed so far while composing — pass "" once committed
+    /// or when there's nothing to show.
+    func setPinyinBuffer(_ text: String) {
+        suggestionBar.setPinyinBuffer(text)
+    }
+
     func showLanguageToast(_ language: SupportedLanguage) {
         toast.show(language: language, in: self)
     }

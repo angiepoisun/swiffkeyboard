@@ -21,9 +21,15 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
     /// directly — only a chosen Hanzi candidate gets inserted. Custom
     /// keyboard extensions can't show real marked/preedit text in the host
     /// app's field (UITextDocumentProxy has no such API, unlike the system
-    /// keyboard), so this buffer and its candidates live entirely in our
-    /// own suggestion bar until committed.
-    private var pinyinBuffer = ""
+    /// keyboard), so this buffer is mirrored into the suggestion bar
+    /// instead (see `setPinyinBuffer`) — the only place it's visible at
+    /// all — and its candidates live there until committed.
+    private var pinyinBuffer = "" {
+        didSet {
+            guard pinyinBuffer != oldValue else { return }
+            keyboardView.setPinyinBuffer(pinyinBuffer)
+        }
+    }
 
     private enum SuggestionContext {
         case none
