@@ -7,6 +7,10 @@ final class WordFrequencyDictionary {
     private(set) var language: SupportedLanguage
     private var frequencyByWord: [String: Int] = [:]
     private var wordsByFirstLetter: [Character: [String]] = [:]
+    /// wrongWord -> word the user corrected it to, so a swipe that keeps
+    /// shape-matching to the wrong word can be steered right without
+    /// needing repeated corrections (see `applyCorrections(to:)`).
+    private var correctionByWrongWord: [String: String] = [:]
     let trie = Trie()
 
     init(language: SupportedLanguage) {
@@ -19,6 +23,7 @@ final class WordFrequencyDictionary {
         self.language = language
         frequencyByWord.removeAll()
         wordsByFirstLetter.removeAll()
+        correctionByWrongWord.removeAll()
         load(language: language)
     }
 
@@ -35,18 +40,28 @@ final class WordFrequencyDictionary {
         }
 
         loadLearnedWords()
+        loadCorrections()
     }
 
-    private func learnedStorageKey() -> String {
+    private func languageStorageKey() -> String {
         "\(language.rawValue):"
     }
 
     private func loadLearnedWords() {
         let learned = AppGroup.defaults.dictionary(forKey: AppGroup.Key.learnedWords) as? [String: Int] ?? [:]
-        let prefix = learnedStorageKey()
+        let prefix = languageStorageKey()
         for (key, count) in learned where key.hasPrefix(prefix) {
             let word = String(key.dropFirst(prefix.count))
             add(word: word, frequency: (frequencyByWord[word.lowercased()] ?? 500) + count * 50)
+        }
+    }
+
+    private func loadCorrections() {
+        let corrections = AppGroup.defaults.dictionary(forKey: AppGroup.Key.glideCorrections) as? [String: String] ?? [:]
+        let prefix = languageStorageKey()
+        for (key, correctedWord) in corrections where key.hasPrefix(prefix) {
+            let wrongWord = String(key.dropFirst(prefix.count))
+            correctionByWrongWord[wrongWord] = correctedWord
         }
     }
 
@@ -65,10 +80,49 @@ final class WordFrequencyDictionary {
         let lower = word.lowercased()
         guard lower.count > 1 else { return }
         var learned = AppGroup.defaults.dictionary(forKey: AppGroup.Key.learnedWords) as? [String: Int] ?? [:]
-        let key = learnedStorageKey() + lower
+        let key = languageStorageKey() + lower
         learned[key] = (learned[key] ?? 0) + 1
         AppGroup.defaults.set(learned, forKey: AppGroup.Key.learnedWords)
         add(word: lower, frequency: (frequencyByWord[lower] ?? 500) + 50)
+    }
+
+    /// Remembers that a swipe which shape-matched to `wrongWord` should
+    /// have produced `correctedWord` instead, so `applyCorrections(to:)` can
+    /// steer future results for the same confusable shape without the user
+    /// having to correct it over and over. One correction is enough to
+    /// take effect — this isn't a statistical model, it's "the user just
+    /// told you the answer, believe them."
+    func recordCorrection(from wrongWord: String, to correctedWord: String) {
+        let wrong = wrongWord.lowercased()
+        let corrected = correctedWord.lowercased()
+        guard wrong != corrected else { return }
+        var corrections = AppGroup.defaults.dictionary(forKey: AppGroup.Key.glideCorrections) as? [String: String] ?? [:]
+        corrections[languageStorageKey() + wrong] = corrected
+        AppGroup.defaults.set(corrections, forKey: AppGroup.Key.glideCorrections)
+        correctionByWrongWord[wrong] = corrected
+        learn(word: correctedWord)
+    }
+
+    /// Re-orders glide candidates so a previously-corrected word wins over
+    /// whatever the raw shape/frequency score currently favors, as long as
+    /// the corrected word is a plausible candidate at all (either already
+    /// in the list, or a known word in this dictionary).
+    func applyCorrections(to candidates: [String]) -> [String] {
+        guard let top = candidates.first,
+              let corrected = correctionByWrongWord[top.lowercased()],
+              corrected != top.lowercased() else {
+            return candidates
+        }
+        if let index = candidates.firstIndex(where: { $0.lowercased() == corrected }) {
+            var reordered = candidates
+            let promoted = reordered.remove(at: index)
+            reordered.insert(promoted, at: 0)
+            return reordered
+        }
+        if frequency(of: corrected) > 0 {
+            return [corrected] + candidates
+        }
+        return candidates
     }
 
     func frequency(of word: String) -> Int {

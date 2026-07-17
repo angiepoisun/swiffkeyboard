@@ -213,11 +213,13 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
             suggestionContext = .committedHanzi(topHanzi)
             keyboardView.setSuggestions(suggestions)
         } else {
-            let cased = applyCurrentCase(to: matchedKey)
+            let candidates = wordDictionary.applyCorrections(to: [matchedKey] + alternateKeys)
+            let top = candidates[0]
+            let cased = applyCurrentCase(to: top)
             textDocumentProxy.insertText(cased + " ")
-            wordDictionary.learn(word: matchedKey)
-            suggestionContext = .committedWord(matchedKey)
-            keyboardView.setSuggestions([matchedKey] + alternateKeys)
+            wordDictionary.learn(word: top)
+            suggestionContext = .committedWord(top)
+            keyboardView.setSuggestions(candidates)
             if isShifted, !isCapsLocked {
                 isShifted = false
                 keyboardView.updateShiftAppearance(shifted: isShifted, capsLocked: isCapsLocked)
@@ -248,6 +250,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
             let cased = applyCurrentCase(to: selectedText)
             textDocumentProxy.insertText(cased + " ")
             wordDictionary.learn(word: selectedText)
+            wordDictionary.recordCorrection(from: current, to: selectedText)
         case .committedHanzi(let current):
             deleteBackward(count: current.count) // no trailing space to account for
             textDocumentProxy.insertText(selectedText)

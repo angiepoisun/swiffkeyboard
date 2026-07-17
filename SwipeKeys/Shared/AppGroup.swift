@@ -12,6 +12,7 @@ enum AppGroup {
         static let enabledLanguageIDs = "enabledLanguageIDs"
         static let activeLanguageID = "activeLanguageID"
         static let learnedWords = "learnedWords"
+        static let glideCorrections = "glideCorrections"
         static let swipeTypingEnabled = "swipeTypingEnabled"
         static let autoCapitalize = "autoCapitalize"
         static let recentEmoji = "recentEmoji"

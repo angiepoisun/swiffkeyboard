@@ -81,10 +81,17 @@ final class BottomBarView: UIView {
 
     private func updateIdleSpaceLabel() {
         guard let language = enabledLanguages[safe: activeLanguageIndex] else {
-            spaceButton.setCustomTitle("space")
+            spaceButton.setCustomTitle("")
             return
         }
-        spaceButton.setCustomTitle("\(language.flag) space")
+        spaceButton.setCustomTitle(idleLabel(for: language), font: .systemFont(ofSize: 15, weight: .regular))
+    }
+
+    /// Wrapped in chevrons only when there's actually somewhere to swipe
+    /// to — with a single language enabled, swiping the spacebar is a
+    /// no-op, so there's nothing to hint at.
+    private func idleLabel(for language: SupportedLanguage) -> String {
+        enabledLanguages.count > 1 ? "‹  \(language.displayName)  ›" : language.displayName
     }
 
     // MARK: - Touch handling
@@ -114,8 +121,8 @@ final class BottomBarView: UIView {
         let previewLanguage = enabledLanguages[previewIndex]
         let progress = min(abs(dx) / commitThreshold, 1.0)
         spaceButton.setCustomTitle(
-            "\(previewLanguage.flag) \(previewLanguage.displayName)",
-            font: .systemFont(ofSize: 13 + 2 * progress, weight: progress >= 1 ? .semibold : .regular),
+            previewLanguage.displayName,
+            font: .systemFont(ofSize: 14 + 2 * progress, weight: progress >= 1 ? .semibold : .regular),
             color: progress >= 1 ? KeyboardTheme.accent : .secondaryLabel
         )
     }
