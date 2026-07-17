@@ -5,7 +5,10 @@ import Foundation
 /// candidates, the way Swype/Gboard-style "glide typing" works:
 ///
 /// 1. Prune the dictionary to words whose first letter is near the path's
-///    start and whose length roughly matches the path's geometry.
+///    start, then to those whose *own* ideal-path length (see step 2) is in
+///    the same ballpark as the raw swipe's length — not a generic per-letter
+///    estimate, since words with widely-spaced letters (e.g. "keyboard")
+///    naturally have long ideal paths despite being ordinary-length words.
 /// 2. For each surviving candidate, build the "ideal" path a perfect swipe
 ///    through its letters would take (see `PathSampler.idealPath`).
 /// 3. Resample both paths to the same number of points and score by mean
@@ -39,15 +42,9 @@ enum GlideTypingEngine {
     ) -> [String] {
         guard rawPath.count >= 2, let start = rawPath.first, let end = rawPath.last else { return [] }
 
-        // 1. Prune: only consider keys starting near the path's first key,
-        // within a plausible length range for how far the finger travelled.
         guard let startLetter = nearestKey(to: start, in: keyCenters) else { return [] }
         let pathLength = totalLength(rawPath)
         let averageKeySpacing = averageSpacing(of: keyCenters)
-        let approxLetterCount = averageKeySpacing > 0 ? pathLength / averageKeySpacing : 0
-        let minLength = max(2, Int(approxLetterCount * 0.35))
-        let maxLength = max(minLength + 2, Int(approxLetterCount * 2.2) + 2)
-
         let endLetter = nearestKey(to: end, in: keyCenters)
 
         let pool = source.candidateKeys(startingWith: startLetter)
@@ -57,7 +54,23 @@ enum GlideTypingEngine {
 
         var scored: [Candidate] = []
         for word in pool {
-            guard word.count >= minLength, word.count <= maxLength else { continue }
+            guard let ideal = PathSampler.idealPath(for: word, keyCenters: keyCenters) else { continue }
+
+            // 1. Prune: compare the raw swipe's length against *this
+            // candidate's own* ideal-path length, not a generic estimate
+            // based on average key spacing. A generic per-letter estimate
+            // silently excludes any word whose letters happen to be spread
+            // far apart on the keyboard (e.g. "keyboard": k-e-y-b-o-a-r-d
+            // zigzags corner to corner) — its true path is long even though
+            // the word itself isn't, so an estimate that assumes "long path
+            // implies many letters" wrongly rules it out before scoring.
+            // Comparing against the word's own geometry has no such bias.
+            let idealLength = totalLength(ideal)
+            if idealLength > 0 {
+                let ratio = pathLength / idealLength
+                guard ratio > 0.3, ratio < 3.2 else { continue }
+            }
+
             if let endLetter, word.count > 2, let lastChar = word.lowercased().last, lastChar != endLetter {
                 // Soft filter: skip keys that clearly end far from where
                 // the finger lifted, unless the key is very short.
@@ -65,7 +78,6 @@ enum GlideTypingEngine {
                     continue
                 }
             }
-            guard let ideal = PathSampler.idealPath(for: word, keyCenters: keyCenters) else { continue }
             let sampledIdeal = PathSampler.resample(ideal, to: resampleCount)
             let shapeDistance = meanDistance(sampledUserPath, sampledIdeal)
             let normalizedShape = averageKeySpacing > 0 ? shapeDistance / averageKeySpacing : shapeDistance

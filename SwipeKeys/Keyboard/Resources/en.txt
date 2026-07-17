@@ -568,3 +568,8 @@ common 434
 rare 433
 special 432
 ordinary 431
+keyboard 430
+typing 429
+swipe 428
+type 427
+language 426
