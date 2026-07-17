@@ -18,6 +18,7 @@ final class SuggestionBarView: UIView {
     private var buttons: [UIButton] = []
     private var words: [String] = []
     private let pinyinLabel = UILabel()
+    private let scrollView = UIScrollView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -28,6 +29,9 @@ final class SuggestionBarView: UIView {
         pinyinLabel.textAlignment = .left
         pinyinLabel.isUserInteractionEnabled = false
         addSubview(pinyinLabel)
+
+        scrollView.showsHorizontalScrollIndicator = false
+        addSubview(scrollView)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -45,6 +49,7 @@ final class SuggestionBarView: UIView {
             let button = UIButton(type: .system)
             var config = UIButton.Configuration.plain()
             config.title = word
+            config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
             config.baseForegroundColor = index == 0 ? .label : .secondaryLabel
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
@@ -54,7 +59,7 @@ final class SuggestionBarView: UIView {
             button.configuration = config
             button.tag = index
             button.addTarget(self, action: #selector(tapped(_:)), for: .touchUpInside)
-            addSubview(button)
+            scrollView.addSubview(button)
             return button
         }
         setNeedsLayout()
@@ -78,11 +83,26 @@ final class SuggestionBarView: UIView {
             pinyinLabel.frame = .zero
         }
 
-        guard !buttons.isEmpty else { return }
-        let availableWidth = max(0, bounds.width - leadingInset)
-        let width = availableWidth / CGFloat(buttons.count)
-        for (index, button) in buttons.enumerated() {
-            button.frame = CGRect(x: leadingInset + CGFloat(index) * width, y: 0, width: width, height: bounds.height)
+        let scrollFrame = CGRect(x: leadingInset, y: 0, width: max(0, bounds.width - leadingInset), height: bounds.height)
+        scrollView.frame = scrollFrame
+
+        guard !buttons.isEmpty else {
+            scrollView.contentSize = .zero
+            return
         }
+
+        // Up to ~4 candidates fill the available width evenly, same as
+        // before. Past that, buttons take their natural (readable) width
+        // instead of being squeezed thinner and thinner, and the bar
+        // scrolls horizontally to reach the rest.
+        let evenWidth = scrollFrame.width / CGFloat(min(buttons.count, 4))
+        var x: CGFloat = 0
+        for button in buttons {
+            let natural = button.sizeThatFits(CGSize(width: .greatestFiniteMagnitude, height: scrollFrame.height)).width
+            let width = max(evenWidth, natural)
+            button.frame = CGRect(x: x, y: 0, width: width, height: scrollFrame.height)
+            x += width
+        }
+        scrollView.contentSize = CGSize(width: max(x, scrollFrame.width), height: scrollFrame.height)
     }
 }

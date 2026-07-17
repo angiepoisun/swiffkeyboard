@@ -30,7 +30,14 @@ final class BottomBarView: UIView {
     private var isDraggingSpace = false
     private var didCommitSwitch = false
 
-    private let commitThreshold: CGFloat = 42
+    /// A fraction of the spacebar's own width rather than a fixed point
+    /// value, so the gesture feels equally reachable on a compact phone and
+    /// a large one instead of requiring a fixed distance that's a much
+    /// smaller fraction of the bar on bigger screens (or clamped so it's
+    /// never awkwardly tiny/huge at the extremes).
+    private var commitThreshold: CGFloat {
+        max(32, min(64, spaceButton.frame.width * 0.16))
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)

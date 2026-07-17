@@ -24,7 +24,7 @@ enum GlideTypingEngine {
     }
 
     private static let resampleCount = 32
-    private static let maxResults = 5
+    private static let maxResults = 8
 
     /// - Parameters:
     ///   - rawPath: the raw touch points captured during the swipe, in the

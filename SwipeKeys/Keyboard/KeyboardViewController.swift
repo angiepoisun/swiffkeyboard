@@ -51,8 +51,16 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { [weak self] _ in
-            self?.heightConstraint?.constant = self?.preferredHeight(for: size) ?? 280
+            self?.updateHeightConstraint()
         })
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        // Also catches iPad multitasking/Stage Manager resizes, which
+        // change available size without necessarily firing
+        // viewWillTransition the way a phone rotation does.
+        updateHeightConstraint()
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -83,7 +91,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         ])
         self.keyboardView = keyboardView
 
-        let heightConstraint = view.heightAnchor.constraint(equalToConstant: preferredHeight(for: UIScreen.main.bounds.size))
+        let heightConstraint = view.heightAnchor.constraint(equalToConstant: preferredHeight)
         heightConstraint.priority = .defaultHigh
         heightConstraint.isActive = true
         self.heightConstraint = heightConstraint
@@ -92,8 +100,21 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         keyboardView.setLanguages(languages, activeIndex: activeLanguageIndex)
     }
 
-    private func preferredHeight(for size: CGSize) -> CGFloat {
-        size.width > size.height ? 210 : 280
+    private func updateHeightConstraint() {
+        heightConstraint?.constant = preferredHeight
+    }
+
+    /// Deliberately not derived from `UIScreen.main` — that API doesn't
+    /// reliably reflect the per-window/scene size a keyboard extension
+    /// actually renders at (worse on newer/larger devices and any kind of
+    /// multitasking), and a mismatched height throws off every proportional
+    /// frame calculated from it downstream, including where the spacebar's
+    /// swipe-to-switch-language gesture actually sits versus where it
+    /// visually appears. `traitCollection.verticalSizeClass` is supplied by
+    /// the system for the controller's actual current context, so it can't
+    /// drift out of sync the way a one-time upfront guess can.
+    private var preferredHeight: CGFloat {
+        traitCollection.verticalSizeClass == .compact ? 210 : 280
     }
 
     private var activeCandidateSource: any GlideCandidateSource {
@@ -133,6 +154,9 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         if isPinyinMode, !pinyinBuffer.isEmpty {
             commitPinyinBuffer()
         }
+        suggestionContext = .none
+        keyboardView.setSuggestions([])
+        keyboardView.setPinyinBuffer("")
         mode = newMode
         presentCurrentPage()
     }
@@ -209,14 +233,25 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
             guard let topHanzi = primaryCandidates.first else { return }
             textDocumentProxy.insertText(topHanzi)
 
+            // Every homophone of the matched pinyin key, then every
+            // homophone of each alternate key the glide also scored well —
+            // not just each alternate's top pick — so a near-miss on the
+            // matched syllable still surfaces the character you meant.
             var suggestions = primaryCandidates
             for altKey in alternateKeys {
-                if let altTop = pinyinDictionary.hanziCandidates(forExactPinyin: altKey).first,
-                   !suggestions.contains(altTop) {
-                    suggestions.append(altTop)
+                for hanzi in pinyinDictionary.hanziCandidates(forExactPinyin: altKey) where !suggestions.contains(hanzi) {
+                    suggestions.append(hanzi)
+                    if suggestions.count >= 12 { break }
                 }
+                if suggestions.count >= 12 { break }
             }
             suggestionContext = .committedHanzi(topHanzi)
+            // Show what pinyin the swipe was actually matched to alongside
+            // the candidates — the buffer itself is already cleared above
+            // (for input-accumulation purposes), this is purely a display
+            // of "here's what got matched" so a wrong match is obvious
+            // instead of silently producing an unexplained character.
+            keyboardView.setPinyinBuffer(matchedKey)
             keyboardView.setSuggestions(suggestions)
         } else {
             let candidates = wordDictionary.applyCorrections(to: [matchedKey] + alternateKeys)
@@ -292,6 +327,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         }
         suggestionContext = .none
         keyboardView.setSuggestions([])
+        keyboardView.setPinyinBuffer("")
         updateAutoShiftState()
     }
 
@@ -414,6 +450,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         keyboardView.setDictionary(activeCandidateSource)
         keyboardView.setLanguages(languages, activeIndex: activeLanguageIndex)
         keyboardView.setSuggestions([])
+        keyboardView.setPinyinBuffer("")
         if showToast {
             keyboardView.showLanguageToast(language)
         }
