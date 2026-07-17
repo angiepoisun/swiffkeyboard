@@ -36,7 +36,7 @@ final class PinyinDictionary {
 
     private func load(language: SupportedLanguage) {
         let bundle = Bundle(for: PinyinDictionary.self)
-        guard let url = bundle.url(forResource: language.wordListResourceName, withExtension: "txt"),
+        guard let url = bundle.swipeKeysResourceURL(named: language.wordListResourceName, withExtension: "txt"),
               let contents = try? String(contentsOf: url, encoding: .utf8) else { return }
 
         for line in contents.split(separator: "\n") {

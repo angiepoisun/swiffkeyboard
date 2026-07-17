@@ -24,7 +24,7 @@ final class WordFrequencyDictionary {
 
     private func load(language: SupportedLanguage) {
         let bundle = Bundle(for: WordFrequencyDictionary.self)
-        if let url = bundle.url(forResource: language.wordListResourceName, withExtension: "txt"),
+        if let url = bundle.swipeKeysResourceURL(named: language.wordListResourceName, withExtension: "txt"),
            let contents = try? String(contentsOf: url, encoding: .utf8) {
             for line in contents.split(separator: "\n") {
                 let parts = line.split(separator: " ")

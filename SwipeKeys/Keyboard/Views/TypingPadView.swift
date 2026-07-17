@@ -40,6 +40,11 @@ final class TypingPadView: UIView {
         trailLayer.lineWidth = 4
         trailLayer.lineCap = .round
         trailLayer.lineJoin = .round
+        // Key buttons are added later (in rebuild(), whenever a page loads)
+        // as subviews, which would otherwise stack their layers above this
+        // one purely by insertion order. zPosition keeps the trail drawn on
+        // top regardless of when buttons get rebuilt.
+        trailLayer.zPosition = 1
         layer.addSublayer(trailLayer)
     }
 
