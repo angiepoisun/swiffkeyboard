@@ -12,10 +12,16 @@ protocol TypingPadDelegate: AnyObject {
 /// several keys without lifting is captured as a glide-typing path and
 /// handed to `GlideTypingEngine`. On non-glideable pages (symbols) a drag
 /// still lets you "slide to select" the key you release on, matching
-/// standard iOS keyboard behavior.
+/// standard iOS keyboard behavior. A long press on a key with accent
+/// variants (see `KeyLetterVariants`) pops up the standard iOS-style
+/// picker strip instead.
 final class TypingPadView: UIView {
     weak var delegate: TypingPadDelegate?
     var dictionary: (any GlideCandidateSource)?
+
+    /// Returns the long-press accent/alternate options for a base letter in
+    /// the currently active language, or [] if that key has none.
+    var variantsProvider: (String) -> [String] = { _ in [] }
 
     private(set) var page = KeyboardPage(rows: [])
     private var isShifted = false
@@ -32,6 +38,12 @@ final class TypingPadView: UIView {
     private var hoveredButton: KeyButton?
     private var backspaceRepeatTimer: Timer?
     private var lastShiftTapTime: TimeInterval = 0
+
+    private var longPressTimer: Timer?
+    private var pendingVariantButton: KeyButton?
+    private var pendingVariantBase: String = ""
+    private var isSelectingVariant = false
+    private var variantPopup: KeyVariantPopupView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -130,6 +142,7 @@ final class TypingPadView: UIView {
         let point = touch.location(in: self)
         currentPath = [point]
         isGliding = false
+        isSelectingVariant = false
         let button = self.button(at: point)
         touchStartButton = button
         hoveredButton = button
@@ -138,16 +151,34 @@ final class TypingPadView: UIView {
         if case .backspace = button?.definition {
             startBackspaceRepeat()
         }
+
+        if case .char(let base) = button?.definition {
+            let variants = variantsProvider(base)
+            if !variants.isEmpty {
+                pendingVariantButton = button
+                pendingVariantBase = base
+                longPressTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+                    self?.activateVariantPopup(variants: variants)
+                }
+            }
+        }
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         let point = touch.location(in: self)
+
+        if isSelectingVariant, let popup = variantPopup {
+            popup.updateSelection(index: popup.index(forX: point.x - popup.frame.minX))
+            return
+        }
+
         currentPath.append(point)
 
         if glideEnabled, !isGliding, let start = currentPath.first, point.distance(to: start) > 16 {
             isGliding = true
             cancelBackspaceRepeat()
+            cancelLongPressTimer() // a real drag means this was never a long press
         }
         if isGliding {
             updateTrail()
@@ -159,6 +190,11 @@ final class TypingPadView: UIView {
             hoveredButton?.isKeyHighlighted = false
             newHover?.isKeyHighlighted = true
             hoveredButton = newHover
+            if newHover !== touchStartButton {
+                // Wandered onto a different key before the timer fired —
+                // don't let a stale timer pop up variants for the wrong key.
+                cancelLongPressTimer()
+            }
         }
     }
 
@@ -166,8 +202,16 @@ final class TypingPadView: UIView {
         defer {
             allButtons.forEach { $0.isKeyHighlighted = false }
             cancelBackspaceRepeat()
+            cancelLongPressTimer()
             clearTrail()
             isGliding = false
+        }
+
+        if isSelectingVariant, let popup = variantPopup {
+            let selected = popup.options[popup.selectedIndex]
+            dismissVariantPopup()
+            delegate?.typingPad(self, didTapKey: .char(selected))
+            return
         }
 
         if isGliding {
@@ -185,6 +229,8 @@ final class TypingPadView: UIView {
         clearTrail()
         isGliding = false
         cancelBackspaceRepeat()
+        cancelLongPressTimer()
+        dismissVariantPopup()
     }
 
     private func handleTap(on button: KeyButton) {
@@ -198,6 +244,30 @@ final class TypingPadView: UIView {
             lastShiftTapTime = now
         }
         delegate?.typingPad(self, didTapKey: button.definition)
+    }
+
+    // MARK: - Long-press accent variants
+
+    private func activateVariantPopup(variants: [String]) {
+        guard let button = pendingVariantButton, !isGliding else { return }
+        isSelectingVariant = true
+        cancelBackspaceRepeat()
+        button.isKeyHighlighted = false
+
+        let options = [pendingVariantBase] + variants
+        let popup = KeyVariantPopupView(options: options)
+        let popupHeight: CGFloat = min(48, button.frame.height)
+        let popupWidth = max(button.frame.width, CGFloat(options.count) * 34)
+        let x = min(max(4, button.frame.midX - popupWidth / 2), bounds.width - popupWidth - 4)
+        popup.frame = CGRect(x: x, y: button.frame.minY - popupHeight - 6, width: popupWidth, height: popupHeight)
+        addSubview(popup)
+        variantPopup = popup
+    }
+
+    private func dismissVariantPopup() {
+        variantPopup?.removeFromSuperview()
+        variantPopup = nil
+        isSelectingVariant = false
     }
 
     private func finishGlide() {
@@ -260,5 +330,10 @@ final class TypingPadView: UIView {
     private func cancelBackspaceRepeat() {
         backspaceRepeatTimer?.invalidate()
         backspaceRepeatTimer = nil
+    }
+
+    private func cancelLongPressTimer() {
+        longPressTimer?.invalidate()
+        longPressTimer = nil
     }
 }

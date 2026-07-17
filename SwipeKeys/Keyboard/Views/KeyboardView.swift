@@ -51,6 +51,14 @@ final class KeyboardView: UIView, TypingPadDelegate, BottomBarDelegate, Suggesti
         typingPad.dictionary = dictionary
     }
 
+    /// Long-press accent/alternate options for a base letter — see
+    /// `KeyLetterVariants`. Set once; the closure should read the
+    /// controller's own current-language state dynamically rather than
+    /// needing to be re-set on every language switch.
+    func setVariantsProvider(_ provider: @escaping (String) -> [String]) {
+        typingPad.variantsProvider = provider
+    }
+
     func setLanguages(_ languages: [SupportedLanguage], activeIndex: Int) {
         bottomBar.enabledLanguages = languages
         bottomBar.activeLanguageIndex = activeIndex

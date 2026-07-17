@@ -98,6 +98,10 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
 
         keyboardView.setDictionary(activeCandidateSource)
         keyboardView.setLanguages(languages, activeIndex: activeLanguageIndex)
+        keyboardView.setVariantsProvider { [weak self] base in
+            guard let self else { return [] }
+            return KeyLetterVariants.variants(for: base, language: self.activeLanguage)
+        }
     }
 
     private func updateHeightConstraint() {
@@ -411,7 +415,12 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
             keyboardView.setSuggestions([])
             return
         }
-        keyboardView.setSuggestions(pinyinDictionary.candidates(forPrefix: pinyinBuffer))
+        // Apple's own Pinyin keyboard shows every word sharing the typed
+        // pinyin, not a fixed handful — the suggestion bar scrolls
+        // horizontally now, so there's no longer a good reason to cap this
+        // artificially low. The real limiting factor is dictionary size,
+        // not this number.
+        keyboardView.setSuggestions(pinyinDictionary.candidates(forPrefix: pinyinBuffer, limit: 24))
     }
 
     private func updateAutoShiftState() {

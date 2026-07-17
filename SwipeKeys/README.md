@@ -16,6 +16,13 @@ a keyboard extension.
 - Tapping `123` shows a symbols page (with a `#+=` key for a second symbols
   page); the emoji toggle opens a category-tabbed emoji grid with a
   `ABC` key to return to letters.
+- **Long-press a letter** for accented/alternate variants (é è ê ë…),
+  matching the standard iOS convention — drag across the popup strip to
+  pick one, release on the base letter (the default first option) for a
+  normal tap. Per-language mappings live in
+  `Keyboard/Layout/KeyLetterVariants.swift`. Not offered in Pinyin mode:
+  input there is toneless romanization matched against a toneless
+  dictionary, so a tone-marked vowel wouldn't match anything.
 
 ## Swipe (glide) typing
 
@@ -94,8 +101,16 @@ into Hanzi, exactly like a real Pinyin IME:
   inserts the top Hanzi candidate directly, with homophones/alternates
   offered in the suggestion bar to replace it.
 - The bundled `zh-Hans.txt` / `zh-Hant.txt` (tab-separated
-  `pinyin  hanzi  frequency`) cover common HSK1–2-level vocabulary (~180
-  entries) — a working demo, not a production IME dictionary.
+  `pinyin  hanzi  frequency`) cover common HSK1–2-level vocabulary plus
+  the highest-frequency single characters (~245 entries) — a working
+  demo, not a production IME dictionary. The suggestion bar shows every
+  matching word for the typed pinyin (scrolls horizontally past ~4
+  candidates) the way Apple's own Pinyin keyboard does, and the
+  algorithm has no artificial cap on that — but with an order of
+  magnitude fewer entries than Apple's built-in dictionary, "every
+  matching word" is still a much shorter list. Widening this further is
+  a data problem (more curated `pinyin\thanzi\tfrequency` rows), not a
+  code one.
 - There's no fallback mode for typing literal Latin text (email addresses,
   English words) while a Chinese keyboard is active — real Pinyin IMEs
   usually have an "abc" toggle for that; out of scope here.
