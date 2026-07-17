@@ -29,10 +29,9 @@ targets:
         excludes:
           - "Info.plist"
           - "SwipeKeys.entitlements"
-          - "Assets.xcassets/**"
       - path: Shared
     resources:
-      - path: App/Assets.xcassets
+      - path: AppResources/Assets.xcassets
     entitlements:
       path: App/SwipeKeys.entitlements
       properties:

@@ -81,6 +81,8 @@ into Hanzi, exactly like a real Pinyin IME:
 SwipeKeys/
   project.yml              XcodeGen project spec (generates the .xcodeproj)
   App/                     Container app (SwiftUI) — onboarding + language/settings screen
+  AppResources/
+    Assets.xcassets          App icon + accent color. Deliberately kept outside App/ — see below.
   Keyboard/                The keyboard extension (UIKit)
     KeyboardViewController.swift   State machine: shift/caps, mode, active language, text insertion
     Layout/                 Per-language key layouts, symbol pages, emoji categories
@@ -116,6 +118,20 @@ hand-edit and impossible to verify without Xcode). To build:
    switch to it from any text field (Full Access is not required — the app
    works entirely through the standard `UITextDocumentProxy` and the shared
    App Group).
+
+## A note on `AppResources/Assets.xcassets`
+
+The asset catalog lives outside `App/` on purpose. Earlier it sat at
+`App/Assets.xcassets`, excluded from the `App` target's `sources:` entry
+and separately declared under `resources:` — the standard XcodeGen pattern
+for asset catalogs. In practice that overlap (same folder referenced by
+both an excluded-from `sources` path and a `resources` path) caused
+XcodeGen to silently drop the catalog from the generated project entirely
+— it wouldn't even show up in Xcode's navigator, so no `Assets.car` ever
+got compiled and app-icon validation failed no matter what was inside the
+catalog. Moving it to a sibling folder that no `sources` entry ever scans
+removes the overlap and the ambiguity with it. Don't move it back under
+`App/` without re-testing that XcodeGen actually includes it.
 
 ## Known limitations (given the scope of a first pass)
 
