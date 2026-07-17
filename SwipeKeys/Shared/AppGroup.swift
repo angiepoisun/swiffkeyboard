@@ -78,6 +78,18 @@ enum SupportedLanguage: String, CaseIterable, Identifiable, Codable {
         case .chineseSimplified, .chineseTraditional: return .pinyin
         }
     }
+
+    /// BCP-47-ish language code `UITextChecker` expects.
+    var textCheckerLanguageCode: String {
+        switch self {
+        case .englishUS: return "en_US"
+        case .spanish: return "es_ES"
+        case .french: return "fr_FR"
+        case .german: return "de_DE"
+        case .chineseSimplified: return "zh_Hans"
+        case .chineseTraditional: return "zh_Hant"
+        }
+    }
 }
 
 enum KeyboardInputMethod {

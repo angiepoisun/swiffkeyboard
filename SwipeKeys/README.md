@@ -42,6 +42,31 @@ dictionaries (a few hundred words per language, `word frequency` per line)
 — swap in larger frequency-ranked word lists for production use; the
 loader and pruning logic already scale to that.
 
+### Apple's dictionary (`SystemDictionary` / `UITextChecker`)
+
+Third-party keyboards don't get access to Apple's own QuickType prediction
+model or the system keyboard's word list — that stays private, with or
+without Full Access. What *is* exposed is `UITextChecker`, the same engine
+behind system-wide spell-check and autocomplete, and it's what
+`Keyboard/Engine/SystemDictionary.swift` wraps:
+
+- Tap-typing suggestions (`refreshSuggestions` in
+  `KeyboardViewController`) blend our own `WordFrequencyDictionary`
+  completions (which know about your personal learned/corrected words)
+  with `UITextChecker.completions(forPartialWordRange:in:language:)` —
+  real dictionary coverage well beyond the ~180–570-word curated lists.
+- Every "learned" word — from tap-typing, accepting a swipe, or
+  correcting one — also calls `UITextChecker.learnWord(_:)`, which writes
+  into the device's shared user dictionary. That's system-wide (every
+  app's spell-checker benefits, not just this one), which is the honest
+  scope of "learning" a third-party keyboard can plug into.
+- `UITextChecker` has no bulk "all words starting with X" API, so it
+  can't replace the enumerable pool `GlideTypingEngine` scores swipe
+  paths against — the curated word lists still do that job. Swipe
+  benefits from this indirectly: anything learned via a swipe correction
+  also strengthens `UITextChecker`'s suggestions on the next tap-typed
+  word.
+
 ## Chinese (Pinyin)
 
 Chinese Simplified and Traditional don't type like the Latin languages —

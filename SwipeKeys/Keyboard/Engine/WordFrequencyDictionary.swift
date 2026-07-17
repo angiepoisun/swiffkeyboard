@@ -75,7 +75,10 @@ final class WordFrequencyDictionary {
         }
     }
 
-    /// Persist that the user typed this word, boosting its rank next time.
+    /// Persist that the user typed this word, boosting its rank next time —
+    /// both in our own frequency table and, via `SystemDictionary`, in the
+    /// device's shared system dictionary so the learning isn't trapped
+    /// inside this app.
     func learn(word: String) {
         let lower = word.lowercased()
         guard lower.count > 1 else { return }
@@ -84,6 +87,7 @@ final class WordFrequencyDictionary {
         learned[key] = (learned[key] ?? 0) + 1
         AppGroup.defaults.set(learned, forKey: AppGroup.Key.learnedWords)
         add(word: lower, frequency: (frequencyByWord[lower] ?? 500) + 50)
+        SystemDictionary.learn(word: lower)
     }
 
     /// Remembers that a swipe which shape-matched to `wrongWord` should

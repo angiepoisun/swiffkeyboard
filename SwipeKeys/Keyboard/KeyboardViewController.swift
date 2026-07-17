@@ -324,12 +324,22 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewActionDel
         return String(word.reversed())
     }
 
+    /// Blends our own learned/corrected words (which Apple's dictionary has
+    /// no way to know about) with Apple's actual system dictionary via
+    /// `UITextChecker` — far broader coverage than our curated word lists,
+    /// same engine behind system-wide autocomplete and spell-check.
     private func refreshSuggestions() {
         guard mode == .letters, case .typingWord(let word) = suggestionContext, !word.isEmpty else {
             keyboardView.setSuggestions([])
             return
         }
-        keyboardView.setSuggestions(wordDictionary.completions(forPrefix: word))
+        var results = wordDictionary.completions(forPrefix: word, limit: 3)
+        let systemResults = SystemDictionary.completions(forPrefix: word, languageCode: activeLanguage.textCheckerLanguageCode, limit: 5)
+        for candidate in systemResults where !results.contains(where: { $0.caseInsensitiveCompare(candidate) == .orderedSame }) {
+            results.append(candidate)
+            if results.count >= 5 { break }
+        }
+        keyboardView.setSuggestions(results)
     }
 
     private func refreshPinyinSuggestions() {
