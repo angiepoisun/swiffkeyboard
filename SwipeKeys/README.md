@@ -3,6 +3,35 @@
 A custom iOS keyboard with glide (swipe) typing, built as a container app +
 a keyboard extension.
 
+## Project status
+
+Feature-complete as a demo/portfolio custom keyboard extension — not
+under active development toward being a daily-driver replacement for the
+system keyboard, and deliberately so. Two hard limits make that a fight
+we can't win, confirmed while building this:
+
+- **Recent iOS versions already swipe the spacebar to switch between
+  installed languages on the stock keyboard** (Settings → General →
+  Keyboard → Keyboards → add more than one). That was SwipeKeys' original
+  reason to exist — reclaiming the globe key's space — and it's simply
+  native now. Anyone who wants that gesture already has it without this
+  app.
+- Third-party keyboard extensions cannot access Apple's real dictionaries,
+  QuickType prediction model, or bulk word-enumeration APIs (see
+  "Apple's dictionary" below) — that's a permanent OS sandboxing
+  boundary, not something achievable with more engineering. The stock
+  keyboard's glide typing and Pinyin input will always out-accuracy this
+  one.
+
+What's left here is a genuine working example of the parts that *are*
+buildable by a third party: a from-scratch glide-typing engine (path
+resampling, shape scoring, frequency ranking, learned corrections),
+multi-language QWERTY/AZERTY/QWERTZ layouts, Pinyin composing with a
+candidate bar, long-press accent variants, and `UITextChecker`
+integration. Bug reports are still worth fixing; chasing dictionary size
+or glide precision further isn't, since the ceiling is Apple's private
+engine, not this codebase.
+
 ## Layout
 
 - **Number row** always on top, then a **QWERTY/AZERTY/QWERTZ letter block**
